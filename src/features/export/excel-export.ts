@@ -58,10 +58,15 @@ export async function createMethodWorkbook(payload: MethodExportPayload) {
   }
 
   const hasResultContent = Boolean(payload.table || payload.additionalTables?.length || payload.chartImage)
-  const results = hasResultContent ? createReportSheet(workbook, 'Resultados', payload.method.name, 'Resultados, tablas de comprobación y visualización') : undefined
+  const resultColumnCount = Math.max(
+    REPORT_COLUMNS,
+    payload.table?.columns.length ?? 0,
+    ...(payload.additionalTables?.map(({ table }) => table.columns.length) ?? []),
+  )
+  const results = hasResultContent ? createReportSheet(workbook, 'Resultados', payload.method.name, 'Resultados, tablas de comprobación y visualización', resultColumnCount) : undefined
   if (results) {
-    if (payload.table) writeTable(results, 'Resultados principales', payload.table, { freezeHeader: true, autoFilter: true })
-    payload.additionalTables?.forEach(({ title, table }) => writeTable(results, title, table))
+    if (payload.table) writeTable(results, 'Resultados principales', payload.table, { freezeHeader: true, autoFilter: true, totalRow: payload.tableTotals })
+    payload.additionalTables?.forEach(({ title, table, totalRow }) => writeTable(results, title, table, { totalRow }))
     if (payload.chartImage) writeChartImage(workbook, results, payload.chartImage)
     finalizeSheet(results)
   }
@@ -82,18 +87,18 @@ export async function downloadMethodWorkbook(payload: MethodExportPayload) {
   URL.revokeObjectURL(url)
 }
 
-function createReportSheet(workbook: Workbook, name: string, methodName: string, subtitle: string) {
+function createReportSheet(workbook: Workbook, name: string, methodName: string, subtitle: string, columnCount = REPORT_COLUMNS) {
   const worksheet = workbook.addWorksheet(sanitizeWorksheetName(name))
   worksheet.properties.defaultRowHeight = 19
   worksheet.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 }
-  worksheet.mergeCells(`A1:${toExcelColumn(REPORT_COLUMNS)}1`)
+  worksheet.mergeCells(`A1:${toExcelColumn(columnCount)}1`)
   const title = worksheet.getCell('A1')
   title.value = `NUMERYX · ${methodName}`
   title.font = { name: 'Aptos', bold: true, size: 16, color: { argb: WHITE } }
   title.fill = solidFill(NAVY)
   title.alignment = { vertical: 'middle' }
   worksheet.getRow(1).height = 30
-  worksheet.mergeCells(`A2:${toExcelColumn(REPORT_COLUMNS)}2`)
+  worksheet.mergeCells(`A2:${toExcelColumn(columnCount)}2`)
   const subheading = worksheet.getCell('A2')
   subheading.value = subtitle
   subheading.font = { name: 'Aptos', italic: true, size: 10, color: { argb: MUTED } }
@@ -173,7 +178,7 @@ function writeProcedure(worksheet: Worksheet, steps: readonly string[]) {
   worksheet.views = [{ state: 'frozen', ySplit: header.number }]
 }
 
-function writeTable(worksheet: Worksheet, title: string, table: ResultTable, options: { freezeHeader?: boolean; autoFilter?: boolean } = {}): TableRange {
+function writeTable(worksheet: Worksheet, title: string, table: ResultTable, options: { freezeHeader?: boolean; autoFilter?: boolean; totalRow?: ResultTable['rows'][number] } = {}): TableRange {
   worksheet.addRow([])
   const columnCount = Math.max(1, table.columns.length)
   const heading = worksheet.addRow([title])
@@ -185,6 +190,10 @@ function writeTable(worksheet: Worksheet, title: string, table: ResultTable, opt
     const row = worksheet.addRow(table.columns.map((column) => record[column.id] ?? null))
     styleTableRow(row, table.columns, rowIndex)
   })
+  if (options.totalRow) {
+    const totalRow = worksheet.addRow(table.columns.map((column) => options.totalRow?.[column.id] ?? null))
+    styleTableTotalRow(totalRow, table.columns)
+  }
   const range = { headerRow: header.number, lastRow: header.number + table.rows.length, columnCount }
   if (options.freezeHeader) worksheet.views = [{ state: 'frozen', ySplit: header.number }]
   if (options.autoFilter && !worksheet.autoFilter) worksheet.autoFilter = { from: { row: header.number, column: 1 }, to: { row: range.lastRow, column: columnCount } }
@@ -228,6 +237,17 @@ function styleTableRow(row: ReturnType<Worksheet['addRow']>, columns: readonly R
     cell.font = { name: 'Aptos', color: { argb: TEXT } }
     cell.fill = solidFill(rowIndex % 2 === 1 ? LIGHT_ROW : WHITE)
     cell.alignment = { horizontal: column.numeric ? 'right' : 'left', vertical: 'top', wrapText: !column.numeric }
+    cell.border = TABLE_BORDER
+    if (column.numeric && typeof cell.value === 'number') cell.numFmt = numberFormat(column)
+  })
+}
+
+function styleTableTotalRow(row: ReturnType<Worksheet['addRow']>, columns: readonly ResultColumn[]) {
+  columns.forEach((column, index) => {
+    const cell = row.getCell(index + 1)
+    cell.font = { name: 'Aptos', bold: true, color: { argb: NAVY } }
+    cell.fill = solidFill('FFCFFAFE')
+    cell.alignment = { horizontal: column.numeric ? 'right' : 'left', vertical: 'middle', wrapText: !column.numeric }
     cell.border = TABLE_BORDER
     if (column.numeric && typeof cell.value === 'number') cell.numFmt = numberFormat(column)
   })

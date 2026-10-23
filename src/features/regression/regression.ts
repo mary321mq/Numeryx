@@ -104,6 +104,7 @@ export function fitMultipleLinearRegression(observations: readonly MultipleObser
     kind: 'multiple',
     coefficients,
     predictorCount,
+    normalEquations: buildNormalEquations(designMatrix, target),
     points: observations.map((observation, index) => ({
       index: index + 1,
       predictors: [...observation.predictors],

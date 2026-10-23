@@ -7,6 +7,8 @@ import { createXYDrafts, type XYDraft } from '@/components/forms/xy-draft'
 import { ResultTable } from '@/components/tables/result-table'
 import { Button } from '@/components/ui/button'
 import { downloadMethodWorkbook } from '@/features/export/excel-export'
+import { createMultipleCalculationReport, type MultipleCalculationReport } from '@/features/regression/multiple-report'
+import { createPolynomialCalculationReport, type PolynomialCalculationReport } from '@/features/regression/polynomial-report'
 import { fitMultipleLinearRegression, fitPolynomialRegression, fitSimpleLinearRegression } from '@/features/regression/regression'
 import type { MultipleLinearRegressionResult, MultipleObservation, PolynomialRegressionResult, RegressionResult, SimpleLinearRegressionResult, XYObservation } from '@/features/regression/types'
 import { RegressionProblemError } from '@/features/regression/types'
@@ -202,6 +204,8 @@ function RegressionResultView({ method, result, variableNames = [] }: { method: 
   const chartSeries = useMemo(() => result ? createChartSeries(result) : [], [result])
   const chartInfo = result ? getChartInfo(result) : null
   const table = result ? createResultTable(result, variableNames) : null
+  const polynomialReport = result?.kind === 'polynomial' ? createPolynomialCalculationReport(result) : null
+  const multipleReport = result?.kind === 'multiple' ? createMultipleCalculationReport(result, variableNames) : null
   const captureChart = useCallback((capture: ChartCapture) => { chartCapture.current = capture }, [])
 
   if (!result || !table || !chartInfo) {
@@ -212,13 +216,23 @@ function RegressionResultView({ method, result, variableNames = [] }: { method: 
     setExportState('working')
     try {
       const chartImage = await chartCapture.current?.()
+      const detailedReport = polynomialReport ?? multipleReport
       await downloadMethodWorkbook({
         method,
         generatedAt: new Date(),
         inputs: createExportInputs(result, variableNames),
         highlights: createHighlights(result, variableNames),
         originalData: createOriginalDataTable(result, variableNames),
-        table,
+        table: detailedReport?.calculationTable ?? table,
+        ...(detailedReport ? {
+          tableTotals: detailedReport.totals,
+          additionalTables: [
+            { title: 'Estadísticos del ajuste', table: detailedReport.statistics },
+            { title: 'Matriz normal C = XᵀX', table: detailedReport.normalMatrix },
+            { title: 'Vector b = Xᵀy', table: detailedReport.rightHandVector },
+            { title: 'Coeficientes del modelo', table: detailedReport.coefficients },
+          ],
+        } : {}),
         procedure: createProcedure(result, variableNames).map((step) => `${step.title}: ${step.content}`),
         diagnostics: result.kind === 'polynomial' ? result.warnings : [],
         chartImage: chartImage ? { base64Png: chartImage, title: chartInfo.title } : undefined,
@@ -229,7 +243,63 @@ function RegressionResultView({ method, result, variableNames = [] }: { method: 
     }
   }
 
-  return <section className="space-y-5" aria-live="polite"><div className="rounded-xl border border-lime-300/20 bg-lime-300/[0.06] p-4"><p className="text-xs font-bold tracking-[0.12em] text-lime-200 uppercase">Resultado actualizado</p><p className="mt-2 text-sm leading-6 text-slate-300">El ajuste, las métricas, la tabla, el procedimiento y la gráfica corresponden exactamente a las entradas actuales.</p></div><section className="rounded-xl border border-white/10 bg-black/15 p-4 sm:p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div><h3 className="text-lg font-bold text-white">Modelo estimado</h3><p className="mt-2 break-words font-mono text-sm leading-7 text-cyan-100">{buildEquation(result, variableNames)}</p></div><Button type="button" variant="secondary" size="sm" onClick={() => void exportWorkbook()} disabled={exportState === 'working'}><FileSpreadsheet size={16} aria-hidden="true" /> {exportState === 'working' ? 'Generando Excel…' : 'Exportar Excel'}</Button></div>{exportState === 'error' && <p role="alert" className="mt-3 text-sm text-rose-200">No se pudo generar el archivo Excel. Reintenta con este resultado válido.</p>}<MetricGrid result={result} /></section><section className="rounded-xl border border-white/10 bg-black/15 p-4 sm:p-5"><h3 className="text-lg font-bold text-white">Datos, estimaciones y residuos</h3><p className="mt-1 text-sm text-slate-500">Residuo eᵢ = yᵢ − ŷᵢ.</p><div className="mt-4"><ResultTable table={table} /></div></section><section className="rounded-xl border border-white/10 bg-black/15 p-4 sm:p-5"><h3 className="text-lg font-bold text-white">Procedimiento generado con estos datos</h3><div className="mt-4 grid gap-3 lg:grid-cols-2">{createProcedure(result, variableNames).map((step, index) => <article key={step.title} className="rounded-xl border border-white/8 bg-white/[0.025] p-4"><p className="text-xs font-bold tracking-[0.1em] text-cyan-200 uppercase">{index + 1}. {step.title}</p><p className="mt-2 text-sm leading-6 text-slate-300">{step.content}</p></article>)}</div></section><section className="rounded-xl border border-white/10 bg-black/15 p-4 sm:p-5"><h3 className="text-lg font-bold text-white">Gráfica del ajuste</h3><p className="mt-1 text-sm text-slate-500">{chartInfo.description}</p><div className="mt-4"><NumericalChart series={chartSeries} title={chartInfo.title} xAxisTitle={chartInfo.xAxisTitle} yAxisTitle={chartInfo.yAxisTitle} downloadFileName={`${method.slug}-grafica`} onCaptureReady={captureChart} /></div></section>{result.kind === 'polynomial' && result.warnings.length > 0 && <div className="flex gap-3 rounded-xl border border-amber-300/25 bg-amber-300/[0.07] p-4 text-sm leading-6 text-amber-100"><AlertTriangle className="mt-0.5 shrink-0 text-amber-200" size={18} aria-hidden="true" />{result.warnings[0]}</div>}</section>
+  return <section className="space-y-5" aria-live="polite">
+    <div className="rounded-xl border border-lime-300/20 bg-lime-300/[0.06] p-4"><p className="text-xs font-bold tracking-[0.12em] text-lime-200 uppercase">Resultado actualizado</p><p className="mt-2 text-sm leading-6 text-slate-300">El ajuste, las métricas, la tabla, el procedimiento y la gráfica corresponden exactamente a las entradas actuales.</p></div>
+    <section className="rounded-xl border border-white/10 bg-black/15 p-4 sm:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-4"><div><h3 className="text-lg font-bold text-white">Modelo estimado</h3><p className="mt-2 break-words font-mono text-sm leading-7 text-cyan-100">{buildEquation(result, variableNames)}</p></div><Button type="button" variant="secondary" size="sm" onClick={() => void exportWorkbook()} disabled={exportState === 'working'}><FileSpreadsheet size={16} aria-hidden="true" /> {exportState === 'working' ? 'Generando Excel…' : 'Exportar Excel'}</Button></div>
+      {exportState === 'error' && <p role="alert" className="mt-3 text-sm text-rose-200">No se pudo generar el archivo Excel. Reintenta con este resultado válido.</p>}
+      <MetricGrid result={result} />
+    </section>
+    {polynomialReport && result.kind === 'polynomial' ? <PolynomialCalculationSection report={polynomialReport} /> : multipleReport && result.kind === 'multiple' ? <MultipleCalculationSection report={multipleReport} /> : <section className="rounded-xl border border-white/10 bg-black/15 p-4 sm:p-5"><h3 className="text-lg font-bold text-white">Datos, estimaciones y residuos</h3><p className="mt-1 text-sm text-slate-500">Residuo eᵢ = yᵢ − ŷᵢ.</p><div className="mt-4"><ResultTable table={table} /></div></section>}
+    <section className="rounded-xl border border-white/10 bg-black/15 p-4 sm:p-5"><h3 className="text-lg font-bold text-white">Procedimiento generado con estos datos</h3><div className="mt-4 grid gap-3 lg:grid-cols-2">{createProcedure(result, variableNames).map((step, index) => <article key={step.title} className="rounded-xl border border-white/8 bg-white/[0.025] p-4"><p className="text-xs font-bold tracking-[0.1em] text-cyan-200 uppercase">{index + 1}. {step.title}</p><p className="mt-2 text-sm leading-6 text-slate-300">{step.content}</p></article>)}</div></section>
+    <section className="rounded-xl border border-white/10 bg-black/15 p-4 sm:p-5"><h3 className="text-lg font-bold text-white">Gráfica del ajuste</h3><p className="mt-1 text-sm text-slate-500">{chartInfo.description}</p><div className="mt-4"><NumericalChart series={chartSeries} title={chartInfo.title} xAxisTitle={chartInfo.xAxisTitle} yAxisTitle={chartInfo.yAxisTitle} downloadFileName={`${method.slug}-grafica`} onCaptureReady={captureChart} /></div></section>
+    {result.kind === 'polynomial' && result.warnings.length > 0 && <div className="flex gap-3 rounded-xl border border-amber-300/25 bg-amber-300/[0.07] p-4 text-sm leading-6 text-amber-100"><AlertTriangle className="mt-0.5 shrink-0 text-amber-200" size={18} aria-hidden="true" />{result.warnings[0]}</div>}
+  </section>
+}
+
+function PolynomialCalculationSection({ report }: { report: PolynomialCalculationReport }) {
+  return <>
+    <section className="rounded-xl border border-white/10 bg-black/15 p-4 sm:p-5">
+      <h3 className="text-lg font-bold text-white">Tabla de cálculo polinómico</h3>
+      <p className="mt-1 max-w-4xl text-sm leading-6 text-slate-400">Incluye las potencias y productos que forman las ecuaciones normales, además de cada predicción y sus dos sumas de cuadrados. Desplázate horizontalmente para consultar todas las columnas.</p>
+      <div className="mt-4"><DetailedCalculationTable table={report.calculationTable} totals={report.totals} /></div>
+    </section>
+    <section className="rounded-xl border border-white/10 bg-black/15 p-4 sm:p-5">
+      <h3 className="text-lg font-bold text-white">Sistema normal y coeficientes</h3>
+      <p className="mt-1 max-w-4xl text-sm leading-6 text-slate-400">La tabla resume C·a = b, donde C = XᵀX y b = Xᵀy. Los coeficientes se obtienen mediante QR; no se calcula C⁻¹ de forma explícita para evitar amplificar errores numéricos.</p>
+      <div className="mt-4 grid gap-4 xl:grid-cols-3">
+        <article className="rounded-lg border border-white/8 bg-white/[0.025] p-3"><p className="mb-3 text-xs font-bold tracking-[0.1em] text-cyan-200 uppercase">Matriz normal C</p><ResultTable table={report.normalMatrix} /></article>
+        <article className="rounded-lg border border-white/8 bg-white/[0.025] p-3"><p className="mb-3 text-xs font-bold tracking-[0.1em] text-cyan-200 uppercase">Vector b</p><ResultTable table={report.rightHandVector} /></article>
+        <article className="rounded-lg border border-white/8 bg-white/[0.025] p-3"><p className="mb-3 text-xs font-bold tracking-[0.1em] text-cyan-200 uppercase">Vector de coeficientes a</p><ResultTable table={report.coefficients} /></article>
+      </div>
+      <article className="mt-4 max-w-2xl rounded-lg border border-white/8 bg-white/[0.025] p-3"><p className="mb-3 text-xs font-bold tracking-[0.1em] text-cyan-200 uppercase">Estadísticos del ajuste</p><ResultTable table={report.statistics} /></article>
+    </section>
+  </>
+}
+
+function MultipleCalculationSection({ report }: { report: MultipleCalculationReport }) {
+  return <>
+    <section className="rounded-xl border border-white/10 bg-black/15 p-4 sm:p-5">
+      <h3 className="text-lg font-bold text-white">Tabla de cálculo de regresión múltiple</h3>
+      <p className="mt-1 max-w-4xl text-sm leading-6 text-slate-400">Muestra cada predictor, y observado, ŷ, los errores cuadrados y la fila de sumatorias. Desplázate horizontalmente si trabajas con varias variables.</p>
+      <div className="mt-4"><DetailedCalculationTable table={report.calculationTable} totals={report.totals} /></div>
+    </section>
+    <section className="rounded-xl border border-white/10 bg-black/15 p-4 sm:p-5">
+      <h3 className="text-lg font-bold text-white">Sistema normal y coeficientes</h3>
+      <p className="mt-1 max-w-4xl text-sm leading-6 text-slate-400">La tabla resume C·b = Xᵀy, donde C = XᵀX. Los coeficientes se obtienen mediante QR; no se calcula C⁻¹ de forma explícita para evitar amplificar errores numéricos.</p>
+      <div className="mt-4 grid gap-4 xl:grid-cols-3">
+        <article className="rounded-lg border border-white/8 bg-white/[0.025] p-3"><p className="mb-3 text-xs font-bold tracking-[0.1em] text-cyan-200 uppercase">Matriz normal C</p><ResultTable table={report.normalMatrix} /></article>
+        <article className="rounded-lg border border-white/8 bg-white/[0.025] p-3"><p className="mb-3 text-xs font-bold tracking-[0.1em] text-cyan-200 uppercase">Vector Xᵀy</p><ResultTable table={report.rightHandVector} /></article>
+        <article className="rounded-lg border border-white/8 bg-white/[0.025] p-3"><p className="mb-3 text-xs font-bold tracking-[0.1em] text-cyan-200 uppercase">Vector de coeficientes b</p><ResultTable table={report.coefficients} /></article>
+      </div>
+      <article className="mt-4 max-w-2xl rounded-lg border border-white/8 bg-white/[0.025] p-3"><p className="mb-3 text-xs font-bold tracking-[0.1em] text-cyan-200 uppercase">Estadísticos del ajuste</p><ResultTable table={report.statistics} /></article>
+    </section>
+  </>
+}
+
+function DetailedCalculationTable({ table, totals }: { table: ResultTableType; totals: ResultTableType['rows'][number] }) {
+  const { columns, rows } = table
+  return <div className="overflow-x-auto rounded-xl border border-white/10"><table className="min-w-max w-full text-left text-sm"><thead className="bg-white/[0.06] text-xs tracking-wide text-slate-300 uppercase"><tr>{columns.map((column) => <th key={column.id} className="whitespace-nowrap px-4 py-3 font-semibold">{column.label}</th>)}</tr></thead><tbody>{rows.map((row, rowIndex) => <tr key={rowIndex} className="border-t border-white/8 text-slate-300 even:bg-white/[0.025]">{columns.map((column) => <td key={column.id} className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatTableCell(row[column.id], column.numeric, column.precision)}</td>)}</tr>)}</tbody><tfoot><tr className="border-t-2 border-cyan-200/25 bg-cyan-300/[0.08] text-cyan-50">{columns.map((column) => <td key={column.id} className={`whitespace-nowrap px-4 py-3 font-bold tabular-nums ${column.id === 'index' ? 'text-left' : 'text-right'}`}>{formatTableCell(totals[column.id], column.numeric, column.precision)}</td>)}</tr></tfoot></table></div>
 }
 
 function MetricGrid({ result }: { result: RegressionResult }) {
@@ -365,9 +435,15 @@ function formatSignedTerm(value: number, symbol: string) {
 }
 
 function formatNumber(value: number) {
+  return formatTableCell(value, true, 8)
+}
+
+function formatTableCell(value: string | number | null | undefined, numeric?: boolean, precision = 6) {
+  if (value === null || value === undefined) return '—'
+  if (!numeric || typeof value !== 'number') return String(value)
   if (!Number.isFinite(value)) return 'No definido'
   if (Math.abs(value) < 1e-12) return '0'
-  return new Intl.NumberFormat('es-PE', { maximumFractionDigits: 8, useGrouping: false }).format(value)
+  return new Intl.NumberFormat('es-PE', { maximumFractionDigits: precision, useGrouping: false }).format(value)
 }
 
 function formatVector(values: readonly number[]) {

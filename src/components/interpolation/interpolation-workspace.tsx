@@ -8,6 +8,7 @@ import { ResultTable } from '@/components/tables/result-table'
 import { Button } from '@/components/ui/button'
 import { downloadMethodWorkbook } from '@/features/export/excel-export'
 import { calculateLagrangeInterpolation, calculateNewtonInterpolation, evaluateLagrange, evaluateNewton } from '@/features/interpolation/interpolation'
+import { createLagrangeProgression, type LagrangeDegreeReport } from '@/features/interpolation/lagrange-report'
 import type { InterpolationResult, LagrangeInterpolationResult, NewtonInterpolationResult, XYObservation } from '@/features/interpolation/types'
 import { InterpolationProblemError } from '@/features/interpolation/types'
 import type { MethodDefinition } from '@/types/catalog'
@@ -62,7 +63,7 @@ function InterpolationResultView({ method, result }: { method: MethodDefinition;
 
   const exportWorkbook = async () => {
     const image = await chartCapture.current?.()
-    const { table, additionalTables } = createExportTables(result)
+    const { table, tableTotals, additionalTables } = createExportTables(result)
     await downloadMethodWorkbook({
       method,
       generatedAt: new Date(),
@@ -75,6 +76,7 @@ function InterpolationResultView({ method, result }: { method: MethodDefinition;
       highlights: [{ label: 'Polinomio', value: buildPolynomial(result) }, { label: `P${subscript(result.degree)}(${formatNumber(result.targetX)})`, value: result.targetY }],
       originalData: createOriginalDataTable(result),
       table,
+      tableTotals,
       additionalTables,
       diagnostics: [`Se verificó Pₙ(xᵢ) = yᵢ en ${result.verification.length} nodo(s).`, extrapolation ? 'El valor objetivo está fuera del intervalo de los nodos; el resultado es una extrapolación.' : 'El valor objetivo se encuentra dentro del intervalo de los nodos.'],
       procedure: buildProcedure(result),
@@ -86,7 +88,13 @@ function InterpolationResultView({ method, result }: { method: MethodDefinition;
 }
 
 function LagrangeDetail({ result }: { result: LagrangeInterpolationResult }) {
-  return <section className="space-y-4"><SectionTitle title="Bases de Lagrange y sustitución" description="Pₙ(x) = Σ yᵢLᵢ(x). Cada tarjeta muestra la base evaluada exactamente en el valor objetivo." /><div className="grid gap-3 lg:grid-cols-2">{result.bases.map((basis) => <article key={basis.index} className="rounded-xl border border-white/10 bg-black/15 p-4"><p className="text-sm font-bold text-white">L{subscript(basis.index)} para x{subscript(basis.index)} = {formatNumber(basis.nodeX)}</p><p className="mt-2 overflow-x-auto text-xs leading-6 text-slate-300"><code>L{subscript(basis.index)}({formatNumber(result.targetX)}) = {formatLagrangeFraction(result, basis.index)} = {formatNumber(basis.valueAtTarget)}</code></p><p className="mt-2 text-xs leading-5 text-slate-500">y{subscript(basis.index)}·L{subscript(basis.index)} = {formatNumber(basis.nodeY)} · {formatNumber(basis.valueAtTarget)} = <span className="font-semibold text-cyan-100">{formatNumber(basis.contribution)}</span></p></article>)}</div><ResultTable table={{ columns: [{ id: 'index', label: 'i', numeric: true, precision: 0 }, { id: 'x', label: 'xᵢ', numeric: true }, { id: 'y', label: 'yᵢ', numeric: true }, { id: 'basis', label: 'Lᵢ(x objetivo)', numeric: true }, { id: 'contribution', label: 'yᵢLᵢ', numeric: true }], rows: result.bases.map((basis) => ({ index: basis.index, x: basis.nodeX, y: basis.nodeY, basis: basis.valueAtTarget, contribution: basis.contribution })) }} /></section>
+  const progression = createLagrangeProgression(result)
+  return <section className="space-y-4"><SectionTitle title="Desarrollo progresivo por grado" description="Como en tu hoja de cálculo: P₁ usa los dos primeros nodos, P₂ añade el tercero y así sucesivamente hasta el polinomio final." /><div className="grid gap-4 2xl:grid-cols-2">{progression.map((step) => <LagrangeDegreeCard key={step.degree} step={step} />)}</div><section className="rounded-xl border border-white/10 bg-black/15 p-4"><p className="text-xs font-bold tracking-[0.12em] text-cyan-200 uppercase">Tabla del polinomio final</p><p className="mt-2 text-sm text-slate-400">Cada contribución yᵢLᵢ se suma para obtener P{subscript(result.degree)}({formatNumber(result.targetX)}).</p><div className="mt-4"><ResultTable table={lagrangeBasisTable(result)} /></div></section></section>
+}
+
+function LagrangeDegreeCard({ step }: { step: LagrangeDegreeReport }) {
+  const { result } = step
+  return <article className="rounded-xl border border-cyan-200/15 bg-cyan-300/[0.035] p-4"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-xs font-bold tracking-[0.1em] text-cyan-200 uppercase">Grado {step.degree}</p><h4 className="mt-1 text-base font-bold text-white">P{subscript(step.degree)}({formatNumber(result.targetX)})</h4></div><span className="rounded-md border border-cyan-200/20 bg-black/15 px-2 py-1 font-mono text-xs text-cyan-100">x = {formatNumber(result.targetX)}</span></div><p className="mt-3 text-xs leading-5 text-slate-400">Nodos usados: {result.observations.map((point, index) => `(x${subscript(index)}=${formatNumber(point.x)}, y${subscript(index)}=${formatNumber(point.y)})`).join(' · ')}</p><p className="mt-3 overflow-x-auto font-mono text-xs leading-6 text-slate-200">{buildPolynomial(result)}</p><div className="mt-3 space-y-2">{result.bases.map((basis) => <div key={basis.index} className="rounded-lg border border-white/8 bg-black/15 p-3"><p className="font-semibold text-slate-100">L{subscript(basis.index)}({formatNumber(result.targetX)}) = <span className="font-mono text-cyan-100">{formatLagrangeFraction(result, basis.index)}</span> = {formatNumber(basis.valueAtTarget)}</p><p className="mt-1 text-xs text-slate-400">y{subscript(basis.index)}·L{subscript(basis.index)} = {formatNumber(basis.nodeY)} · {formatNumber(basis.valueAtTarget)} = <span className="font-semibold text-cyan-100">{formatNumber(basis.contribution)}</span></p></div>)}</div><div className="mt-3 rounded-lg border border-lime-300/20 bg-lime-300/[0.07] px-3 py-2 text-sm font-bold text-lime-100">P{subscript(step.degree)}({formatNumber(result.targetX)}) = {formatNumber(result.targetY)}</div></article>
 }
 
 function NewtonDetail({ result }: { result: NewtonInterpolationResult }) {
@@ -130,17 +138,41 @@ function createOriginalDataTable(result: InterpolationResult): ResultTableType {
   }
 }
 
+function lagrangeBasisTable(result: LagrangeInterpolationResult): ResultTableType {
+  return {
+    columns: [
+      { id: 'index', label: 'i', numeric: true, precision: 0 },
+      { id: 'x', label: 'xᵢ', numeric: true },
+      { id: 'y', label: 'yᵢ', numeric: true },
+      { id: 'formula', label: 'Base Lᵢ(x objetivo)' },
+      { id: 'basis', label: 'Lᵢ(x objetivo)', numeric: true },
+      { id: 'contribution', label: 'yᵢLᵢ', numeric: true },
+    ],
+    rows: result.bases.map((basis) => ({ index: basis.index, x: basis.nodeX, y: basis.nodeY, formula: formatLagrangeFraction(result, basis.index), basis: basis.valueAtTarget, contribution: basis.contribution })),
+  }
+}
+
+function lagrangeTotalRow(result: LagrangeInterpolationResult) {
+  return { index: `P${subscript(result.degree)}(x)`, x: null, y: null, formula: 'Σ yᵢLᵢ(x)', basis: null, contribution: result.targetY }
+}
+
 function createExportTables(result: InterpolationResult) {
   const verification = { title: 'Verificación de nodos', table: verificationTable(result) }
   if (result.kind === 'lagrange') {
+    const progression = createLagrangeProgression(result)
     return {
-      table: { columns: [{ id: 'index', label: 'i', numeric: true, precision: 0 }, { id: 'x', label: 'xᵢ', numeric: true }, { id: 'y', label: 'yᵢ', numeric: true }, { id: 'basis', label: 'Lᵢ(x objetivo)', numeric: true }, { id: 'contribution', label: 'yᵢLᵢ', numeric: true }], rows: result.bases.map((basis) => ({ index: basis.index, x: basis.nodeX, y: basis.nodeY, basis: basis.valueAtTarget, contribution: basis.contribution })) },
-      additionalTables: [verification],
+      table: lagrangeBasisTable(result),
+      tableTotals: lagrangeTotalRow(result),
+      additionalTables: [
+        ...progression.slice(0, -1).map((step) => ({ title: `Desarrollo de grado ${step.degree}: P${subscript(step.degree)}(${formatNumber(step.result.targetX)})`, table: lagrangeBasisTable(step.result), totalRow: lagrangeTotalRow(step.result) })),
+        verification,
+      ],
     }
   }
   const columns = [{ id: 'index', label: 'i', numeric: true, precision: 0 }, { id: 'x', label: 'xᵢ', numeric: true }, ...result.dividedDifferences.map((_column, order) => ({ id: `order-${order}`, label: order === 0 ? 'f[xᵢ]' : `Orden ${order}`, numeric: true }))]
   return {
     table: { columns, rows: result.observations.map((point, index) => Object.fromEntries([['index', index], ['x', point.x], ...result.dividedDifferences.map((column, order) => [`order-${order}`, index < column.length ? column[index] : null])])) },
+    tableTotals: undefined,
     additionalTables: [verification],
   }
 }

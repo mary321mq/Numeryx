@@ -3,6 +3,7 @@ import type { Fill, Worksheet } from 'exceljs'
 
 import { METHODS } from '@/config/methods'
 import { calculateLagrangeInterpolation, calculateNewtonInterpolation } from '@/features/interpolation/interpolation'
+import { createPolynomialCalculationReport } from '@/features/regression/polynomial-report'
 import { fitMultipleLinearRegression, fitPolynomialRegression, fitSimpleLinearRegression } from '@/features/regression/regression'
 import type { MethodDefinition } from '@/types/catalog'
 import type { MethodExportPayload } from '@/types/export'
@@ -18,6 +19,39 @@ describe('exportación Excel profesional', () => {
     expect(sanitizeWorksheetName('Newton: x/y? [prueba]*')).toBe('Newton x y prueba')
     expect(sanitizeWorksheetName('a'.repeat(40))).toHaveLength(31)
   })
+
+  it('presenta sumas, matriz normal y coeficientes en el Excel polinómico', async () => {
+    const polynomial = fitPolynomialRegression([{ x: 2, y: 5.6 }, { x: 3, y: 7.8 }, { x: 4, y: 10 }, { x: 5, y: 11 }], 2)
+    const report = createPolynomialCalculationReport(polynomial)
+    const workbook = await createMethodWorkbook({
+      method: method('polynomial-regression'),
+      generatedAt: GENERATED_AT,
+      inputs: { Observaciones: polynomial.metrics.observationCount, Grado: polynomial.degree },
+      table: report.calculationTable,
+      tableTotals: report.totals,
+      additionalTables: [
+        { title: 'Estadísticos del ajuste', table: report.statistics },
+        { title: 'Matriz normal C = XᵀX', table: report.normalMatrix },
+        { title: 'Vector b = Xᵀy', table: report.rightHandVector },
+        { title: 'Coeficientes del modelo', table: report.coefficients },
+      ],
+    })
+    const buffer = await workbook.xlsx.writeBuffer()
+    const { default: ExcelJS } = await import('exceljs')
+    const reopened = new ExcelJS.Workbook()
+    await reopened.xlsx.load(buffer)
+    const results = reopened.getWorksheet('Resultados')
+
+    expect(results?.getCell('A5').value).toBe('i')
+    expect(results?.getCell('F5').value).toBe('x⁴')
+    expect(results?.getCell('A10').value).toBe('Σ')
+    expect(results?.getCell('J10').value).toBeCloseTo(polynomial.metrics.sse, 12)
+    expect(patternFillColor(results?.getCell('A10').fill)).toBe('FFCFFAFE')
+    expect(results?.getCell('A12').value).toBe('Estadísticos del ajuste')
+    expect(results?.getCell('A14').value).toBe('n')
+    expect(results?.getCell('B14').value).toBe(4)
+    expect(results?.getCell('A23').value).toBe('Matriz normal C = XᵀX')
+  }, 20_000)
 
   for (const fixture of createFixtures()) {
     it(`genera y reabre un libro profesional de ${fixture.method.name}`, async () => {

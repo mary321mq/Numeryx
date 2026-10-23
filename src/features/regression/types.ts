@@ -67,6 +67,7 @@ export interface MultipleLinearRegressionResult {
   kind: 'multiple'
   coefficients: readonly number[]
   predictorCount: number
+  normalEquations: NormalEquationSystem
   points: readonly MultipleRegressionPoint[]
   metrics: RegressionMetrics
 }

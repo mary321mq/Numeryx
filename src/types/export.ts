@@ -14,6 +14,7 @@ export interface ExportChartImage {
 export interface ExportDataTable {
   title: string
   table: ResultTable
+  totalRow?: ResultTable['rows'][number]
 }
 
 export interface MethodExportPayload {
@@ -22,6 +23,7 @@ export interface MethodExportPayload {
   inputs: Readonly<Record<string, string | number | boolean | null>>
   originalData?: ResultTable
   table?: ResultTable
+  tableTotals?: ResultTable['rows'][number]
   additionalTables?: readonly ExportDataTable[]
   highlights?: readonly ExportResultHighlight[]
   diagnostics?: readonly string[]

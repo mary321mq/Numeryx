@@ -1,3 +1,4 @@
+import { getCategoryBySlug } from '@/config/categories'
 import type { MethodDefinition } from '@/types/catalog'
 
 export const METHODS: readonly MethodDefinition[] = [
@@ -14,22 +15,22 @@ export const METHODS: readonly MethodDefinition[] = [
   { id: 'lu-factorization', categoryId: 'linear-systems', slug: 'factorizacion-lu', name: 'Factorización LU', description: 'Descompone una matriz para resolver sistemas eficientemente.', status: 'planned', tags: ['directo', 'matrices'] },
   { id: 'jacobi', categoryId: 'linear-systems', slug: 'jacobi', name: 'Jacobi', description: 'Actualiza las incógnitas con valores de la iteración anterior.', status: 'planned', tags: ['iterativo', 'matrices'] },
   { id: 'gauss-seidel', categoryId: 'linear-systems', slug: 'gauss-seidel', name: 'Gauss-Seidel', description: 'Aprovecha valores recién actualizados dentro de cada iteración.', status: 'planned', tags: ['iterativo', 'matrices'] },
-  { id: 'simple-linear-regression', categoryId: 'regression', slug: 'regresion-lineal-simple', name: 'Regresión lineal simple', description: 'Ajusta una recta a pares de observaciones y mide su ajuste.', status: 'scaffolded', priority: 'next', tags: ['datos', 'ajuste'] },
-  { id: 'polynomial-regression', categoryId: 'regression', slug: 'regresion-polinomica', name: 'Regresión polinómica', description: 'Ajusta un polinomio de grado controlado a una serie de datos.', status: 'scaffolded', priority: 'next', tags: ['datos', 'polinomios'] },
-  { id: 'multiple-linear-regression', categoryId: 'regression', slug: 'regresion-lineal-multiple', name: 'Regresión lineal múltiple', description: 'Relaciona una variable de respuesta con varios predictores.', status: 'scaffolded', priority: 'next', tags: ['datos', 'multivariable'] },
+  { id: 'simple-linear-regression', categoryId: 'regression', slug: 'regresion-lineal-simple', name: 'Regresión lineal simple', description: 'Ajusta una recta a pares de observaciones y mide su ajuste.', status: 'implemented', priority: 'next', tags: ['datos', 'ajuste'] },
+  { id: 'polynomial-regression', categoryId: 'regression', slug: 'regresion-polinomica', name: 'Regresión polinómica', description: 'Ajusta un polinomio de grado controlado a una serie de datos.', status: 'implemented', priority: 'next', tags: ['datos', 'polinomios'] },
+  { id: 'multiple-linear-regression', categoryId: 'regression', slug: 'regresion-lineal-multiple', name: 'Regresión lineal múltiple', description: 'Relaciona una variable de respuesta con varios predictores.', status: 'implemented', priority: 'next', tags: ['datos', 'multivariable'] },
   { id: 'trapezoidal-rule', categoryId: 'integration', slug: 'regla-trapecio', name: 'Regla del trapecio', description: 'Aproxima el área mediante segmentos trapezoidales.', status: 'planned', tags: ['cuadratura', 'integrales'] },
   { id: 'simpson-one-third', categoryId: 'integration', slug: 'simpson-1-3', name: 'Simpson 1/3', description: 'Usa parábolas sobre subintervalos pares para aproximar una integral.', status: 'planned', tags: ['cuadratura', 'integrales'] },
   { id: 'simpson-three-eighths', categoryId: 'integration', slug: 'simpson-3-8', name: 'Simpson 3/8', description: 'Aplica una aproximación cúbica en grupos de tres subintervalos.', status: 'planned', tags: ['cuadratura', 'integrales'] },
   { id: 'euler', categoryId: 'differential-equations', slug: 'euler', name: 'Euler', description: 'Avanza la solución usando la pendiente al inicio de cada paso.', status: 'planned', tags: ['edo', 'iterativo'] },
   { id: 'improved-euler', categoryId: 'differential-equations', slug: 'euler-mejorado', name: 'Euler mejorado', description: 'Corrige el paso de Euler al considerar una pendiente promedio.', status: 'planned', tags: ['edo', 'iterativo'] },
   { id: 'runge-kutta-4', categoryId: 'differential-equations', slug: 'runge-kutta-orden-4', name: 'Runge-Kutta de orden 4', description: 'Combina cuatro estimaciones de pendiente por cada paso.', status: 'planned', tags: ['edo', 'iterativo'] },
-  { id: 'lagrange-interpolation', categoryId: 'interpolation', slug: 'interpolacion-lagrange', name: 'Interpolación de Lagrange', description: 'Construye un polinomio usando bases asociadas a cada nodo.', status: 'scaffolded', priority: 'next', tags: ['datos', 'polinomios'] },
-  { id: 'newton-divided-differences', categoryId: 'interpolation', slug: 'newton-diferencias-divididas', name: 'Newton por diferencias divididas', description: 'Construye el polinomio incrementalmente desde una tabla de diferencias.', status: 'scaffolded', priority: 'next', tags: ['datos', 'polinomios'] },
+  { id: 'lagrange-interpolation', categoryId: 'interpolation', slug: 'interpolacion-lagrange', name: 'Interpolación de Lagrange', description: 'Construye y verifica un polinomio usando bases asociadas a cada nodo.', status: 'implemented', priority: 'next', tags: ['datos', 'polinomios'] },
+  { id: 'newton-divided-differences', categoryId: 'interpolation', slug: 'newton-diferencias-divididas', name: 'Newton por diferencias divididas', description: 'Construye y verifica el polinomio desde una tabla de diferencias divididas.', status: 'implemented', priority: 'next', tags: ['datos', 'polinomios'] },
 ] as const
 
 export function getMethodBySlug(categorySlug: string, methodSlug: string) {
-  void categorySlug
-  return METHODS.find((method) => method.slug === methodSlug)
+  const category = getCategoryBySlug(categorySlug)
+  return METHODS.find((method) => method.slug === methodSlug && method.categoryId === category?.id)
 }
 
 export function getMethodsByCategory(categoryId: string) {

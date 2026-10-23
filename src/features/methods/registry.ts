@@ -7,26 +7,31 @@ const DATA_TABLE_FIELDS = [
 export const methodIntegrations: Readonly<Record<string, MethodIntegrationContract>> = {
   'simple-linear-regression': {
     inputSchema: DATA_TABLE_FIELDS,
+    workspace: 'regression',
     chartSupport: true,
     exportSupport: true,
   },
   'polynomial-regression': {
     inputSchema: [...DATA_TABLE_FIELDS, { id: 'degree', label: 'Grado del polinomio', kind: 'number', required: true, validation: { min: 1 } }],
+    workspace: 'regression',
     chartSupport: true,
     exportSupport: true,
   },
   'multiple-linear-regression': {
     inputSchema: DATA_TABLE_FIELDS,
+    workspace: 'regression',
     chartSupport: true,
     exportSupport: true,
   },
   'lagrange-interpolation': {
     inputSchema: [...DATA_TABLE_FIELDS, { id: 'targetX', label: 'Valor a interpolar', kind: 'number', required: true }],
+    workspace: 'interpolation',
     chartSupport: true,
     exportSupport: true,
   },
   'newton-divided-differences': {
     inputSchema: [...DATA_TABLE_FIELDS, { id: 'targetX', label: 'Valor a interpolar', kind: 'number', required: true }],
+    workspace: 'interpolation',
     chartSupport: true,
     exportSupport: true,
   },

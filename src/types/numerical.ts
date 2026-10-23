@@ -33,6 +33,8 @@ export interface ChartSeries {
   x: readonly number[]
   y: readonly number[]
   mode?: 'lines' | 'markers' | 'lines+markers'
+  line?: { color?: string; width?: number; dash?: 'solid' | 'dot' | 'dash' }
+  marker?: { color?: string; size?: number; symbol?: string }
 }
 
 export interface NumericalResult {
@@ -48,6 +50,7 @@ export interface MethodExecutionContext {
 
 export interface MethodIntegrationContract {
   inputSchema: readonly MethodInputField[]
+  workspace?: 'standard' | 'regression' | 'interpolation'
   validate?: (context: MethodExecutionContext) => readonly ValidationIssue[]
   calculate?: (context: MethodExecutionContext) => NumericalResult
   resultColumns?: readonly ResultColumn[]

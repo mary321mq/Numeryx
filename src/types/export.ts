@@ -11,12 +11,19 @@ export interface ExportChartImage {
   title?: string
 }
 
+export interface ExportDataTable {
+  title: string
+  table: ResultTable
+}
+
 export interface MethodExportPayload {
   method: MethodDefinition
   generatedAt: Date
   inputs: Readonly<Record<string, string | number | boolean | null>>
   table?: ResultTable
+  additionalTables?: readonly ExportDataTable[]
   highlights?: readonly ExportResultHighlight[]
   diagnostics?: readonly string[]
+  procedure?: readonly string[]
   chartImage?: ExportChartImage
 }

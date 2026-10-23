@@ -9,9 +9,11 @@ describe('catálogo inicial', () => {
     expect(METHODS).toHaveLength(24)
   })
 
-  it('prepara regresión e interpolación como las prioridades siguientes', () => {
+  it('habilita regresión e interpolación', () => {
     const prepared = METHODS.filter((method) => method.status === 'scaffolded')
-    expect(prepared).toHaveLength(5)
+    const implemented = METHODS.filter((method) => method.status === 'implemented')
+    expect(prepared).toHaveLength(0)
+    expect(implemented).toHaveLength(5)
     expect(getMethodsByCategory('regression')).toHaveLength(3)
     expect(getMethodsByCategory('interpolation')).toHaveLength(2)
   })

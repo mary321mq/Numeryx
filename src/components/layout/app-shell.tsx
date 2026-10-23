@@ -36,7 +36,7 @@ export function AppShell() {
       <footer className="border-t border-white/8 bg-[#06101c]">
         <div className="mx-auto flex max-w-7xl flex-col gap-2 px-5 py-7 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between lg:px-8">
           <p>Numeryx · Numerical Methods Lab</p>
-          <p>Fase 4 · Interpolación con cálculo verificable</p>
+          <p>Fase 5 · Exportación Excel profesional</p>
         </div>
       </footer>
     </div>

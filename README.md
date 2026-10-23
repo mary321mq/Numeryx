@@ -1,6 +1,6 @@
 # Numeryx · Numerical Methods Lab
 
-Aplicación web local para explorar métodos numéricos y ejecutar cálculos verificables. Conserva un catálogo de 6 categorías y 24 métodos; en la Fase 4 están disponibles cinco métodos: tres de regresión y dos de interpolación.
+Aplicación web local para explorar métodos numéricos y ejecutar cálculos verificables. Conserva un catálogo de 6 categorías y 24 métodos; actualmente incluye tres métodos de regresión y dos de interpolación.
 
 ## Ejecutar localmente
 
@@ -23,29 +23,31 @@ npm run build
 
 ### Regresión
 
-- **Regresión lineal simple**: ajusta `ŷ = b₀ + b₁x` y presenta sumas, medias, pendiente, intercepto, predicciones, residuos, SSE, SST, R² y RMSE.
+- **Regresión lineal simple**: ajusta `ŷ = b₀ + b₁x` y presenta predicciones, residuos, SSE, SST, R² y RMSE.
 - **Regresión polinómica**: permite grados de 1 a `min(n − 1, 8)` y calcula los coeficientes mediante QR de Householder, sin invertir matrices.
 - **Regresión lineal múltiple**: admite observaciones y predictores editables y detecta rango insuficiente o multicolinealidad.
 
-### Interpolación — Fase 4
+### Interpolación
 
-- **Interpolación de Lagrange**: construye `Pₙ(x) = Σ yᵢLᵢ(x)`, muestra cada base, la sustitución con los nodos reales, la contribución `yᵢLᵢ` y comprueba todos los nodos.
-- **Newton por diferencias divididas**: genera la tabla triangular completa, explica las operaciones que producen sus columnas y muestra el polinomio incremental junto con su comprobación en cada nodo.
+- **Interpolación de Lagrange**: construye `Pₙ(x) = Σ yᵢLᵢ(x)`, muestra cada base, su sustitución y la verificación de los nodos.
+- **Newton por diferencias divididas**: genera la tabla triangular de diferencias, sus operaciones y el polinomio incremental.
 
-En ambos métodos se pueden añadir y eliminar puntos `(x, y)`, definir el valor objetivo y conservar los datos al corregir errores. Las entradas se validan antes del cálculo: no se aceptan celdas vacías, números no finitos ni valores `x` duplicados o demasiado cercanos. Un único nodo se admite como el polinomio constante `P₀`.
+Los métodos de interpolación validan valores vacíos, no finitos y nodos `x` repetidos; admiten un único nodo como `P₀`. No se aplican redondeos durante los cálculos, y se marca una evaluación fuera del intervalo como **extrapolación**.
 
-Los dos métodos calculan sin redondeos intermedios. Si el valor objetivo queda fuera del intervalo de los nodos, Numeryx lo marca como **extrapolación**.
+## Fase 5: exportación Excel profesional
 
-## Visualización y exportación
+Se mantiene **ExcelJS 4.4.0** como única biblioteca de exportación. Ya es compatible con Vite y TypeScript en este proyecto, permite hojas múltiples, estilos, filtros, congelación de paneles e imágenes PNG, y evita incorporar `xlsx-js-style` y un segundo flujo de mantenimiento sin una capacidad necesaria.
 
-Cada resultado incluye una gráfica Plotly con nodos, polinomio interpolante y valor objetivo; permite explorarla y descargarla como PNG. El botón **Exportar Excel** genera un `.xlsx` real con ExcelJS que incorpora:
+Para cada ejecución válida, el archivo `.xlsx` se organiza en hojas no vacías según los datos disponibles:
 
-- método, fecha, puntos originales, valor objetivo, grado, forma del polinomio y resultado;
-- bases de Lagrange o tabla de diferencias divididas de Newton;
-- verificación `Pₙ(xᵢ) − yᵢ` para cada nodo;
-- procedimiento calculado a partir de las entradas y la imagen PNG de la gráfica cuando Plotly está listo.
+1. **Resumen**: identidad de Numeryx, método, fecha, parámetros, ecuación o polinomio, métricas y notas.
+2. **Datos originales**: entradas numéricas de la ejecución actual.
+3. **Procedimiento**: pasos y sustituciones generados por el método.
+4. **Resultados**: estimaciones y residuos de regresión, o bases/verificaciones/diferencias divididas de interpolación.
 
-ExcelJS inserta la gráfica como imagen; no crea una gráfica nativa editable de Excel.
+El sistema común aplica títulos azul marino, encabezados turquesa/azul medio, resultados en verde moderado, bordes finos, filas alternadas, formatos numéricos, ajuste de texto, anchos de columna, filtros y paneles congelados cuando corresponde. Los valores se exportan como números; solo la visualización de Excel limita sus decimales.
+
+La gráfica Plotly de la ejecución actual se captura e inserta como imagen PNG únicamente cuando está disponible. La descarga PNG independiente sigue activa. ExcelJS no genera gráficas nativas editables, por lo que el libro lo indica explícitamente.
 
 ## Arquitectura
 
@@ -56,26 +58,20 @@ src/
     interpolation/   espacio de trabajo, resultados y pasos visuales
     regression/      formularios, resultados y cálculo de regresión
     charts/          Plotly, captura y descarga PNG
-  config/            catálogo de 24 métodos y sus estados
   features/
+    export/          generador ExcelJS común y pruebas de libros reales
     interpolation/   algoritmos puros de Lagrange y Newton + pruebas
     regression/      QR de Householder y pruebas matemáticas
-    export/          generador de libros ExcelJS
     methods/         contratos de espacios de trabajo
+  config/            catálogo de 24 métodos y sus estados
 ```
 
-Los algoritmos de interpolación viven fuera de React y no usan `eval`. `interpolation.ts` crea las bases de Lagrange, la tabla de diferencias divididas y evalúa Newton en forma anidada para conservar estabilidad operativa razonable.
+Los algoritmos permanecen fuera de React. `interpolation.ts` no usa `eval`; `least-squares.ts` resuelve regresión sin invertir matrices.
 
 ## Pruebas
 
-Las pruebas cubren:
-
-- regresión lineal, polinómica y múltiple, incluidas condiciones de error;
-- una recta y un cuadrático interpolados por Lagrange y Newton;
-- reproducción de los nodos, acuerdo entre ambos métodos, `x` repetida y valores no finitos;
-- el caso opcional de un solo nodo `P₀`;
-- creación y reapertura en memoria de un libro `.xlsx`.
+Las pruebas cubren los algoritmos de regresión e interpolación y generan/reabren en memoria cinco archivos Excel reales: regresión lineal simple, polinómica y múltiple; Lagrange; y Newton. Verifican nombres de hojas, títulos, encabezados, datos originales, resultados numéricos, formatos visuales, una imagen PNG insertada y celdas no aplicables vacías en la tabla de Newton.
 
 ## Límites actuales
 
-No se implementan todavía ecuaciones no lineales, sistemas lineales, integración ni EDO. Un polinomio interpolante de grado elevado puede oscilar entre nodos (fenómeno de Runge), especialmente al extrapolar; la gráfica y la etiqueta de extrapolación no sustituyen el análisis del problema. No hay backend, historial persistente ni autenticación.
+No se implementan todavía ecuaciones no lineales, sistemas lineales, integración ni EDO. Polinomios interpolantes de grado elevado pueden oscilar entre nodos, especialmente al extrapolar. La imagen insertada desde Plotly no es una gráfica editable en Excel. No hay backend, historial persistente ni autenticación.

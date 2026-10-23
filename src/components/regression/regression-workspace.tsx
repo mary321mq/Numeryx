@@ -217,6 +217,7 @@ function RegressionResultView({ method, result, variableNames = [] }: { method: 
         generatedAt: new Date(),
         inputs: createExportInputs(result, variableNames),
         highlights: createHighlights(result, variableNames),
+        originalData: createOriginalDataTable(result, variableNames),
         table,
         procedure: createProcedure(result, variableNames).map((step) => `${step.title}: ${step.content}`),
         diagnostics: result.kind === 'polynomial' ? result.warnings : [],
@@ -254,6 +255,20 @@ function createResultTable(result: RegressionResult, variableNames: readonly str
   return {
     columns: [{ id: 'index', label: '#', numeric: true }, { id: 'x', label: 'x', numeric: true, precision: 6 }, { id: 'observed', label: 'y', numeric: true, precision: 6 }, { id: 'predicted', label: 'ŷ', numeric: true, precision: 6 }, { id: 'residual', label: 'e = y − ŷ', numeric: true, precision: 6 }],
     rows: result.points.map((point) => ({ index: point.index, x: point.x, observed: point.observed, predicted: point.predicted, residual: point.residual })),
+  }
+}
+
+function createOriginalDataTable(result: RegressionResult, variableNames: readonly string[]): ResultTableType {
+  if (result.kind === 'multiple') {
+    const predictorColumns = variableNames.map((name, index) => ({ id: `x${index}`, label: name, numeric: true, precision: 6 }))
+    return {
+      columns: [{ id: 'index', label: '#', numeric: true, precision: 0 }, ...predictorColumns, { id: 'observed', label: 'y', numeric: true, precision: 6 }],
+      rows: result.points.map((point) => ({ index: point.index, ...Object.fromEntries(point.predictors.map((value, index) => [`x${index}`, value])), observed: point.observed })),
+    }
+  }
+  return {
+    columns: [{ id: 'index', label: '#', numeric: true, precision: 0 }, { id: 'x', label: 'x', numeric: true, precision: 6 }, { id: 'observed', label: 'y', numeric: true, precision: 6 }],
+    rows: result.points.map((point) => ({ index: point.index, x: point.x, observed: point.observed })),
   }
 }
 

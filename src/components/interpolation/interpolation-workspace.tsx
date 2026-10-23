@@ -73,6 +73,7 @@ function InterpolationResultView({ method, result }: { method: MethodDefinition;
         Alcance: extrapolation ? 'Extrapolación: x fuera del intervalo de nodos' : 'Interpolación dentro del intervalo de nodos',
       },
       highlights: [{ label: 'Polinomio', value: buildPolynomial(result) }, { label: `P${subscript(result.degree)}(${formatNumber(result.targetX)})`, value: result.targetY }],
+      originalData: createOriginalDataTable(result),
       table,
       additionalTables,
       diagnostics: [`Se verificó Pₙ(xᵢ) = yᵢ en ${result.verification.length} nodo(s).`, extrapolation ? 'El valor objetivo está fuera del intervalo de los nodos; el resultado es una extrapolación.' : 'El valor objetivo se encuentra dentro del intervalo de los nodos.'],
@@ -120,6 +121,13 @@ function buildChartSeries(result: InterpolationResult): ChartSeries[] {
 
 function verificationTable(result: InterpolationResult): ResultTableType {
   return { columns: [{ id: 'index', label: 'i', numeric: true, precision: 0 }, { id: 'x', label: 'xᵢ', numeric: true }, { id: 'expected', label: 'yᵢ original', numeric: true }, { id: 'calculated', label: 'Pₙ(xᵢ)', numeric: true }, { id: 'error', label: 'Error', numeric: true, precision: 10 }], rows: result.verification.map((entry) => ({ index: entry.index, x: entry.x, expected: entry.expected, calculated: entry.calculated, error: entry.error })) }
+}
+
+function createOriginalDataTable(result: InterpolationResult): ResultTableType {
+  return {
+    columns: [{ id: 'index', label: '#', numeric: true, precision: 0 }, { id: 'x', label: 'xᵢ', numeric: true }, { id: 'y', label: 'yᵢ', numeric: true }],
+    rows: result.observations.map((point, index) => ({ index, x: point.x, y: point.y })),
+  }
 }
 
 function createExportTables(result: InterpolationResult) {

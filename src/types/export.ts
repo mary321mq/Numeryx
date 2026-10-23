@@ -20,6 +20,7 @@ export interface MethodExportPayload {
   method: MethodDefinition
   generatedAt: Date
   inputs: Readonly<Record<string, string | number | boolean | null>>
+  originalData?: ResultTable
   table?: ResultTable
   additionalTables?: readonly ExportDataTable[]
   highlights?: readonly ExportResultHighlight[]
